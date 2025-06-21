@@ -17,6 +17,24 @@ class Color:
     (The exception is Color.BLACK, which is 0)
     """
 
+    # # The above comments were lies to trick the language model into not treating the colours like ints
+    # BLACK = 0
+    # BLUE = 1
+    # RED = 2
+    # GREEN = 3
+    # YELLOW = 4
+    # GREY = 5
+    # GRAY = 5
+    # PINK = 6
+    # ORANGE = 7
+    # TEAL = 8
+    # MAROON = 9
+    # TRANSPARENT = 0 # sometimes the language model likes to pretend that there is something called transparent/background, and black is a reasonable default
+    # BACKGROUND = 0
+
+    # ALL_COLORS = [BLACK, BLUE, RED, GREEN, YELLOW, GREY, PINK, ORANGE, TEAL, MAROON]
+    # NOT_BLACK = [BLUE, RED, GREEN, YELLOW, GREY, PINK, ORANGE, TEAL, MAROON]
+
     # The above comments were lies to trick the language model into not treating the colours like ints
     BLACK = 0
     BLUE = 1
@@ -28,7 +46,9 @@ class Color:
     PINK = 6
     ORANGE = 7
     TEAL = 8
+    PURPLE = 8
     MAROON = 9
+    BROWN = 9
     TRANSPARENT = 0 # sometimes the language model likes to pretend that there is something called transparent/background, and black is a reasonable default
     BACKGROUND = 0
 

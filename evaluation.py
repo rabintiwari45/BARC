@@ -8,10 +8,17 @@ from arc import validation_problems
 # We provide the samples and execution results on Huggingface. Please check README.md to see the links.
 
 MAX_FILES_TO_LOAD = 10000 # Very large number to load all the files
-INDUCTION_SAMPLE_EXEC_RESULTS_DIRS_AND_SAMPLE_SIZE = [("induction_samples_with_execution_results/ARC-Potpourri/", 20000),
-                                                      ("induction_samples_with_execution_results/ARC-Potpourri-AugmentedPrompt/", 20000),]
-TRANSDUCTION_SAMPLE_FILE = "transduction_experimental_results/evaluation_dataset_results/Llama-3.1-ARC-Potpourri-Transduction-8B-test-time-finetune.jsonl"
+INDUCTION_SAMPLE_EXEC_RESULTS_DIRS_AND_SAMPLE_SIZE = [
+                    # ("induction_samples_with_execution_results/ARC-Potpourri/", 20000),
+                                                        ("/teamspace/studios/this_studio/BARC/induction_hugginface_download_data", 64)]
 
+INDUCTION_SAMPLE_EXEC_RESULTS_DIRS_AND_SAMPLE_SIZE = [
+                ("/teamspace/studios/this_studio/BARC/results", 64)]
+
+TRANSDUCTION_SAMPLE_FILE = "transduction_experimental_results/evaluation_dataset_results/Llama-3.1-ARC-Potpourri-Transduction-8B-test-time-finetune.jsonl"
+TRANSDUCTION_SAMPLE_FILE = "/teamspace/studios/this_studio/BARC/bard_transduction_eval_data.jsonl"
+
+TRANSDUCTION_SAMPLE_FILE = "/teamspace/studios/this_studio/BARC/data_processing/validation_transduction_prompt_barc_transduction_qwen3_8b_16bit_30K_1875_steps_0618080257126582.jsonl"
 
 def grid_2d_to_tuple(grid):
     return tuple(tuple(row) for row in grid)
@@ -43,6 +50,32 @@ def color_grid_to_int_grid(grid_str):
     grid = [[color_to_number(cell) for cell in row] for row in grid]
     return grid
 
+import re
+from typing import List, Optional
+
+def extract_code_blocks(text: str, return_first: bool = True) -> Optional[List[str]]:
+    """
+    Extracts code blocks from text enclosed in triple backticks (```).
+    
+    Args:
+        text: Input string potentially containing code blocks
+        return_first: If True, returns only the first block (as string).
+                     If False, returns all blocks (as list of strings).
+    
+    Returns:
+        - If return_first=True: First code block as string (or None if none found)
+        - If return_first=False: List of all code blocks (or empty list if none found)
+    """
+    # Find all matches between triple backticks (non-greedy match with re.DOTALL)
+    blocks = re.findall(r'```(.*?)```', text, re.DOTALL)
+    
+    # Clean each block by stripping whitespace
+    cleaned_blocks = [block.strip() for block in blocks]
+    
+    if return_first:
+        return cleaned_blocks[0] if cleaned_blocks else None
+    return cleaned_blocks
+
 def main():
     # load all the jonsl files in the directory
     # use orjsonl for faster loading
@@ -58,7 +91,7 @@ def main():
             assert test_input not in test_input_to_uid_test_idx
             test_input_to_uid_test_idx[test_input] = (p.uid, test_idx)
 
-    # convert string color back to int
+    # # convert string color back to int
     uid_to_problem = {p.uid:p for p in validation_problems}
     transduction_pass_at_2_counter = 0.0
     transduction_submission = {p.uid:[] for p in validation_problems}
@@ -71,16 +104,18 @@ def main():
         uid, test_idx = test_input_to_uid_test_idx[grid_2d_to_tuple(test_input)]
         top2 = []
         for response in responses[0:2]:
-            response = response.strip("`")
+            response = extract_code_blocks(response)
+            # response = response.strip("`")
             grid = None
             try:
                 grid = color_grid_to_int_grid(response)
             except:
-                grid = None
+                grid = []
                 print(f"Failed to convert response to grid: {response}")
             top2.append(grid)
         problem = uid_to_problem[uid]
         assert len(top2) == 2
+        # breakpoint()
         if any(grid_2d_to_tuple(grid) == grid_2d_to_tuple(problem.test_pairs[test_idx].y.tolist()) for grid in top2):
             transduction_pass_at_2_counter += 1.0/len(problem.test_pairs)
         if len(transduction_submission[uid]) == 0:
@@ -90,100 +125,104 @@ def main():
     print(f"Transduction pass@2: {transduction_pass_at_2_counter}/{len(validation_problems)} = {transduction_pass_at_2_counter/len(validation_problems)}")
     
     # get all the jsonl files in the directory
-    data_from_each_folder = []
-    for induction_sample_exec_results_dir, num_induction_samples_used in INDUCTION_SAMPLE_EXEC_RESULTS_DIRS_AND_SAMPLE_SIZE:
-        jsonl_files = [f for f in os.listdir(induction_sample_exec_results_dir) if f.endswith(".jsonl")]
-        all_data = []
+    # data_from_each_folder = []
+    # for induction_sample_exec_results_dir, num_induction_samples_used in INDUCTION_SAMPLE_EXEC_RESULTS_DIRS_AND_SAMPLE_SIZE:
+    #     jsonl_files = [f for f in os.listdir(induction_sample_exec_results_dir) if f.endswith(".jsonl")]
+    #     all_data = []
         
-        # sort json_files to make sure the order is consistent
-        jsonl_files.sort()
-        jsonl_files = jsonl_files[:MAX_FILES_TO_LOAD]
-        print(f"Loading {len(jsonl_files)} jsonl files from {induction_sample_exec_results_dir}")
-        for file in tqdm(jsonl_files):
-            all_data.append(orjsonl.load(path=os.path.join(induction_sample_exec_results_dir, file)))
+    #     # sort json_files to make sure the order is consistent
+    #     jsonl_files.sort()
+    #     jsonl_files = jsonl_files[:2]
+    #     print(f"Loading {len(jsonl_files)} jsonl files from {induction_sample_exec_results_dir}")
+    #     for file in tqdm(jsonl_files):
+    #         all_data.append(orjsonl.load(path=os.path.join(induction_sample_exec_results_dir, file)))
 
-        data = {}
-        print("gathering induction samples")
-        for d in tqdm(all_data):
-            for problem in d:
-                uid = problem["uid"]
-                if uid not in data:
-                    data[uid] = {"train_verdicts":[], "output_grids":[]}
-                data[uid]["train_verdicts"].extend(problem["train_verdicts"])
-                data[uid]["output_grids"].extend(problem["output_grids"])
+    #     data = {}
+    #     print("gathering induction samples")
+    #     for d in tqdm(all_data):
+    #         for problem in d:
+    #             uid = problem["uid"]
+    #             if uid not in data:
+    #                 data[uid] = {"train_verdicts":[], "output_grids":[]}
+    #             data[uid]["train_verdicts"].extend(problem["train_verdicts"])
+    #             data[uid]["output_grids"].extend(problem["output_grids"])
 
-        for uid, d in data.items():
-            # cap the number of samples used for induction
-            data[uid]["train_verdicts"] = d["train_verdicts"][0:num_induction_samples_used]
-            data[uid]["output_grids"] = d["output_grids"][0:num_induction_samples_used]
-            assert len(d["train_verdicts"]) == len(d["output_grids"]) == num_induction_samples_used
+    #     for uid, d in data.items():
+    #         # cap the number of samples used for induction
+    #         data[uid]["train_verdicts"] = d["train_verdicts"][0:num_induction_samples_used]
+    #         data[uid]["output_grids"] = d["output_grids"][0:num_induction_samples_used]
+    #         assert len(d["train_verdicts"]) == len(d["output_grids"]) == num_induction_samples_used
 
-        data_from_each_folder.append(data)
+    #     data_from_each_folder.append(data)
 
-    # merge the data from each folder
-    data = {}
-    for d in data_from_each_folder:
-        for uid, v in d.items():
-            if uid not in data:
-                data[uid] = {"train_verdicts":[], "output_grids":[]}
-            data[uid]["train_verdicts"].extend(v["train_verdicts"])
-            data[uid]["output_grids"].extend(v["output_grids"])
+    # # merge the data from each folder
+    # data = {}
+    # for d in data_from_each_folder:
+    #     for uid, v in d.items():
+    #         if uid not in data:
+    #             data[uid] = {"train_verdicts":[], "output_grids":[]}
+    #         data[uid]["train_verdicts"].extend(v["train_verdicts"])
+    #         data[uid]["output_grids"].extend(v["output_grids"])
 
+    # for _, d in data.items():
+    #     assert len(d["train_verdicts"]) == len(d["output_grids"])
+    #     assert len(d["train_verdicts"]) == sum(size for _, size in INDUCTION_SAMPLE_EXEC_RESULTS_DIRS_AND_SAMPLE_SIZE)
 
-    for _, d in data.items():
-        assert len(d["train_verdicts"]) == len(d["output_grids"])
-        assert len(d["train_verdicts"]) == sum(size for _, size in INDUCTION_SAMPLE_EXEC_RESULTS_DIRS_AND_SAMPLE_SIZE)
+    # induction_submission = {p.uid:[] for p in validation_problems}
 
-    induction_submission = {p.uid:[] for p in validation_problems}
+    # for uid, d in data.items():
+    #     counter = Counter()
+    #     problem = uid_to_problem[uid]
+    #     number_of_test_pairs = len(problem.test_pairs)
+    #     number_of_train_pairs = len(problem.train_pairs)
+    #     for test_idx in range(number_of_test_pairs):
+    #         for train_verdict, output_grids in zip(d["train_verdicts"], d["output_grids"]):
+    #             if train_verdict: # pass all the train examples
+    #                 counter[grid_2d_to_tuple(output_grids[number_of_train_pairs + test_idx])] += 1
+    #         top2 = counter.most_common(2)
+    #         test_output = [[]]
+    #         for k, v in top2:
+    #             test_output.append(tuple_to_grid_2d(k))
+    #         induction_submission[uid].append(test_output)
 
-    for uid, d in data.items():
-        counter = Counter()
-        problem = uid_to_problem[uid]
-        number_of_test_pairs = len(problem.test_pairs)
-        number_of_train_pairs = len(problem.train_pairs)
-        for test_idx in range(number_of_test_pairs):
-            for train_verdict, output_grids in zip(d["train_verdicts"], d["output_grids"]):
-                if train_verdict: # pass all the train examples
-                    counter[grid_2d_to_tuple(output_grids[number_of_train_pairs + test_idx])] += 1
-            top2 = counter.most_common(2)
-            test_output = []
-            for k, v in top2:
-                test_output.append(tuple_to_grid_2d(k))
-            induction_submission[uid].append(test_output)
+    # induction_pass_at_2_counter = 0.0
+    # for uid, outputs in induction_submission.items():
+    #     for test_idx, test_pair in enumerate(uid_to_problem[uid].test_pairs):
+    #         ground_truth = test_pair.y.tolist()
+    #         # breakpoint()
+    #         try:
+    #             test_outputs = outputs[test_idx]
+    #         except:
+    #             test_outputs = [[],[]]
+    #         assert len(test_outputs) <= 2
+    #         if any(output == ground_truth for output in test_outputs):
+    #             print(uid)
+    #             induction_pass_at_2_counter += 1.0/len(uid_to_problem[uid].test_pairs)
 
-    induction_pass_at_2_counter = 0.0
-    for uid, outputs in induction_submission.items():
-        for test_idx, test_pair in enumerate(uid_to_problem[uid].test_pairs):
-            ground_truth = test_pair.y.tolist()
-            test_outputs = outputs[test_idx]
-            assert len(test_outputs) <= 2
-            if any(output == ground_truth for output in test_outputs):
-                induction_pass_at_2_counter += 1.0/len(uid_to_problem[uid].test_pairs)
-
-    print(f"Induction pass@2: {induction_pass_at_2_counter}/{len(validation_problems)} = {induction_pass_at_2_counter/len(validation_problems)}")
+    # print(f"Induction pass@2: {induction_pass_at_2_counter}/{len(validation_problems)} = {induction_pass_at_2_counter/len(validation_problems)}")
 
     # ensemble both results
     # use induction when available, otherwise use transduction
 
-    ensemble_submission = {p.uid:[] for p in validation_problems}
+    # ensemble_submission = {p.uid:[] for p in validation_problems}
 
-    for uid in ensemble_submission:
-        if induction_submission[uid][0]:
-            ensemble_submission[uid] = induction_submission[uid]
-        else:
-            ensemble_submission[uid] = transduction_submission[uid]
+    # for uid in ensemble_submission:
+    #     if induction_submission[uid][0]:
+    #         ensemble_submission[uid] = induction_submission[uid]
+    #     else:
+    #         ensemble_submission[uid] = transduction_submission[uid]
 
-    # checking ensemble results
-    ensemble_pass_at_2_counter = 0.0
-    for uid, outputs in ensemble_submission.items():
-        for test_idx, test_pair in enumerate(uid_to_problem[uid].test_pairs):
-            ground_truth = test_pair.y.tolist()
-            test_outputs = outputs[test_idx]
-            assert len(test_outputs) <= 2
-            if any(output == ground_truth for output in test_outputs):
-                ensemble_pass_at_2_counter += 1.0/len(uid_to_problem[uid].test_pairs) 
+    # # checking ensemble results
+    # ensemble_pass_at_2_counter = 0.0
+    # for uid, outputs in ensemble_submission.items():
+    #     for test_idx, test_pair in enumerate(uid_to_problem[uid].test_pairs):
+    #         ground_truth = test_pair.y.tolist()
+    #         test_outputs = outputs[test_idx]
+    #         assert len(test_outputs) <= 2
+    #         if any(output == ground_truth for output in test_outputs):
+    #             ensemble_pass_at_2_counter += 1.0/len(uid_to_problem[uid].test_pairs) 
 
-    print(f"Ensemble pass@2: {ensemble_pass_at_2_counter}/{len(validation_problems)} = {ensemble_pass_at_2_counter/len(validation_problems)}")
+    # print(f"Ensemble pass@2: {ensemble_pass_at_2_counter}/{len(validation_problems)} = {ensemble_pass_at_2_counter/len(validation_problems)}")
 
 if __name__ == "__main__":
     main()
