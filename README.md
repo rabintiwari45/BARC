@@ -132,7 +132,7 @@ Run finetune command, you can change `num_processes` to the gpus you have.
 cd BARC/finetune/alignment-handbook/
 ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/deepspeed_zero3.yaml --num_processes=8 scripts/run_sft.py recipes/barc/transduction_config_fft_engineer_heavy_model.yaml --load_in_4bit=false
 ```
-
+655
 #### Inference setup
 
 * Induction: `vllm==0.6.0`

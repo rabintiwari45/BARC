@@ -54,7 +54,7 @@ concept_arc_problems = new_problems
 
 TRANSPOSE = False
 
-MULTI_EXECUTE = True
+MULTI_EXECUTE = False
 
 class GridComparisonResult(Enum):
     EQUAL = 0
@@ -232,6 +232,9 @@ def main():
     args = parser.parse_args()
     # answer_file = "./finetune/alignment-handbook/arc_problems_train_334_responses_0816013840.jsonl"
     answer_file = args.answer_file
+    answer_file = "/teamspace/studios/this_studio/BARC/finetune/alignment-handbook/arc_problems_validation_400_extra_newline_v2_induction-40k-50seeds-gpt4omini-llama3.1-8b-instruct-lora64_lr2e-4_epoch3_merged_temp_0.8_0616193322315926.jsonl"
+    answer_file = "/teamspace/studios/this_studio/BARC/finetune/alignment-handbook/arc_problems_validation_400_extra_newline_v2_bard_induction_qwen3_8b_16bit_30K_1875_steps_temp_0.8_0617063331592976.jsonl"
+    answer_file = "/teamspace/studios/this_studio/BARC/finetune/alignment-handbook/arc_problems_validation_400_extra_newline_v2_bard_induction_qwen3_8b_16bit_30K_1875_steps_temp_0.8_0617070025410655.jsonl"
     with open(answer_file) as f:
         problem_answers = [json.loads(line) for line in f]
 
@@ -258,7 +261,6 @@ def main():
             else:
                 code = ""
             codes.append(code)
-
         arc_problem = get_arc_problem(uid)
         pass_or_not = False
         train_verdicts = []
@@ -286,6 +288,7 @@ def main():
         else:
             results = multi_validate(arc_problem, codes)
             for idx, result in enumerate(results):
+                # breakpoint()
                 assert len(result) == len(arc_problem.train_pairs + arc_problem.test_pairs)
                 train_verdict = all([verdict for verdict, _ in result[:len(arc_problem.train_pairs)]])
                 train_verdicts.append(train_verdict)
@@ -303,7 +306,7 @@ def main():
 
         problem_answers[problem_idx]["train_verdicts"] = train_verdicts
         problem_answers[problem_idx]["train_test_verdicts"] = train_test_verdicts
-        problem_answers[problem_idx]["output_grids"] = [] # all_output_grids
+        problem_answers[problem_idx]["output_grids"] = all_output_grids # []
         problem_answers[problem_idx]["verdicts_per_examples"] = verdicts_per_example_per_sample
         # print(f"Train verdicts: {train_verdicts}, sum: {sum(train_verdicts)}")
         # print(f"Train test verdicts: {train_test_verdicts}, sum: {sum(train_test_verdicts)}")

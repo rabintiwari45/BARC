@@ -3,10 +3,17 @@ import time
 # LORA_DIR = "data/barc-codestral-sft-qlora-v0.0.3-epoch3"
 
 TEMPERATURE = 0.8
-# BASE_MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+BASE_MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+BASE_MODEL = "meta-llama/Llama-3.1-8B"
 # BASE_MODEL = "./barc-llama3.1-8b-instruct-lora64-induction-gpt4-desc-llama-20k_lr2e-4_epoch3_merged"
 # BASE_MODEL = "./barc-llama3.1-8b-instruct-lora64-induction-gpt4-desc-4omini20k_lr2e-4_epoch3_merged"
-BASE_MODEL = "./barc-llama3.1-8b-instruct-lora64-induction-gpt4mini20k-llama20k_lr2e-4_epoch3_merged"
+# BASE_MODEL = "./barc-llama3.1-8b-instruct-lora64-induction-gpt4mini20k-llama20k_lr2e-4_epoch3_merged"
+# BASE_MODEL = "barc0/barc-llama3.1-8b-instruct-lora64-induction-gpt4mini20k-llama20k_lr2e-4_epoch3"
+# BASE_MODEL = "barc0/induction-40k-50seeds-gpt4omini-llama3.1-8b-instruct-lora64_lr2e-4_epoch3_merged"
+BASE_MODEL = "rdabin/bard_induction_qwen3_8b_16bit_30K_1875_steps"
+# BASE_MODEL = "rdabin/barc_induction_4bt_48K_20_steps"
+# BASE_MODEL = "rdabin/barc_induction_48K_20_steps_16bit"
+# BASE_MODEL = "rdabin/bard_induction_qwen3_8b_16bit_10K_4_steps"
 # BASE_MODEL = "barc0/barc-llama3.1-8b-instruct-fft-sft-induction35k_lr1e-5_epoch2"
 # BASE_MODEL = "data/barc-llama3.1-8b-instruct-fft-induction_gpt4omini100k_lr1e-5_epoch2"
 # LORA_DIR = "data/barc-llama3.1-8b-instruct-sft-qlora-v0.0.3"
@@ -16,7 +23,9 @@ BASE_MODEL = "./barc-llama3.1-8b-instruct-lora64-induction-gpt4mini20k-llama20k_
 # LORA_DIR = "data/barc-llama3.1-8b-instruct-sft-lora-data-gpt4-descriptions"
 # LORA_DIR = "data/barc-llama3.1-8b-instruct-sft-lora-data-gpt4omini-codegen"
 # LORA_DIR = "data/barc-llama3.1-8b-instruct-sft-lora-gpt-4_description_20000_with_gpt-4o-mini_and_llama3_codegen"
+LORA_DIR = "barc0/l3.1-8b-inst-lora64-induction-gpt4wmini100k-mini100k-gpt4wmini20k-gpt4wllama20k-lr2e-4-ep3"
 LORA_DIR = None
+# LORA_DIR = "barc0/barc-llama3.1-8b-instruct-lora64-induction-gpt4mini20k-llama20k_lr2e-4_epoch3"
 # LORA_DIR = "barc0/barc-llama3.1-8b-instruct-lora64-induction-gpt4omini35k_lr2e-4_epoch3"
 
 
@@ -42,6 +51,7 @@ data = []
 # problem_file = "./arc_problems_train_327_extra_newline.jsonl"
 # problem_file = "./arc_problems_validation_400_extra_newline.jsonl"
 problem_file = "./arc_problems_validation_400_extra_newline_v2.jsonl"
+problem_file = "/teamspace/studios/this_studio/BARC/finetune/alignment-handbook/arc_problems_validation_400_extra_newline_v2.jsonl"
 
 with open(problem_file) as f:
     for line in f:
@@ -51,12 +61,12 @@ from vllm import LLM, SamplingParams
 from vllm.lora.request import LoRARequest
 
 if LORA_DIR:
-    llm = LLM(model=BASE_MODEL, enable_lora=True, max_lora_rank=256, max_model_len=12000,
-            enable_prefix_caching=True, tensor_parallel_size=TENSOR_PARALLEL)
+    llm = LLM(model=BASE_MODEL, enable_lora=True, max_lora_rank=64, max_model_len=8196, 
+            enable_prefix_caching=True, tensor_parallel_size=TENSOR_PARALLEL, gpu_memory_utilization=0.825)
     lora_request=LoRARequest("barc_adapter", 1, LORA_DIR)
 else:
-    llm = LLM(model=BASE_MODEL, enable_lora=False, max_model_len=12000,
-            enable_prefix_caching=True, tensor_parallel_size=TENSOR_PARALLEL)
+    llm = LLM(model=BASE_MODEL, enable_lora=False, max_model_len=8196,
+            enable_prefix_caching=True, tensor_parallel_size=TENSOR_PARALLEL,gpu_memory_utilization=0.85)
 
 import datetime
 datetime_str = datetime.datetime.now().strftime("%m%d%H%M%S%f")
@@ -69,7 +79,26 @@ time.sleep(5)
 
 from tqdm import tqdm
 all_responses = []
+# data = data[:5]
+# ids_to_infer = [
+#     'c663677b',
+#     '929ab4e9',
+#     '31d5ba1a',
+#     '7953d61e',]
+
+ids_to_infer = ["0a1d4ef5",	
+"692cd3b6",	
+"1da012fc",	
+"66e6c45b",	
+"3194b014",	
+"963f59bc",	
+"00576224",	
+"1a2e2828",	
+"770cc55f"]
+
 for d in tqdm(data):
+    if d["uid"] not in ids_to_infer:
+        continue
     messages = d["messages"]
     assert messages[0]["role"] == "system"
     assert messages[1]["role"] == "user"
@@ -77,6 +106,7 @@ for d in tqdm(data):
         {"role":"system", "content":messages[0]["content"]},
         {"role":"user", "content":messages[1]["content"]}
     ], tokenize=False, add_generation_prompt=True)
+    # inputs = inputs.replace('\n<think>\n\n</think>\n', '')  + "/no_think"
     input_tokens = tokenizer.apply_chat_template([
         {"role":"system", "content":messages[0]["content"]},
         {"role":"user", "content":messages[1]["content"]}
